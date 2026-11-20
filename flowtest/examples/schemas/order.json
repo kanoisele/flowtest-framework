@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrderCreatedResponse",
+  "type": "object",
+  "required": ["code", "msg", "data"],
+  "properties": {
+    "code": { "type": "integer", "const": 0 },
+    "msg": { "type": "string" },
+    "data": {
+      "type": "object",
+      "required": ["order_id", "book_id", "title", "quantity", "amount", "status"],
+      "properties": {
+        "order_id": { "type": "string", "pattern": "^ORD-[A-Z0-9]{10}$" },
+        "book_id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "amount": { "type": "number", "minimum": 0 },
+        "status": { "type": "string", "enum": ["CREATED", "CANCELLED"] }
+      }
+    }
+  }
+}

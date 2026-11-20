@@ -1,0 +1,95 @@
+name: FlowTest 示例用例集 · 查询与契约校验
+
+cases:
+  - id: search_books
+    name: 关键字检索图书并做 JSON Schema 契约校验
+    tags: [smoke, contract]
+    request:
+      method: GET
+      url: /api/books
+      params:
+        keyword: Python
+        page: 1
+        size: 10
+    extract:
+      total: $.data.total
+      first_book_id: $.data.items[0].id
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.data.total
+        op: ge
+        expect: 1
+      - check: $.data.items
+        op: len_ge
+        expect: 1
+      - check: $.data.page
+        op: eq
+        expect: 1
+      - op: schema
+        schema_file: schemas/book_list.json
+        message: 图书列表响应必须满足接口契约
+
+  - id: builtin_functions
+    name: 内置函数生成动态参数（uuid / 随机串 / 时间戳）
+    tags: [dsl]
+    request:
+      method: GET
+      url: /api/books
+      params:
+        keyword: ${{random_str(6)}}
+        request_id: ${{uuid()}}
+        ts: ${{timestamp()}}
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.code
+        op: eq
+        expect: 0
+      - check: $.data.total
+        op: ge
+        expect: 0
+
+  - id: get_book_detail
+    name: 查询单个图书详情（依赖检索用例所在层）
+    depends_on: [search_books]
+    tags: [contract]
+    request:
+      method: GET
+      url: /api/books/102
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.data.id
+        op: eq
+        expect: 102
+      - check: $.data.title
+        op: contains
+        expect: 测试
+      - check: $.data.price
+        op: gt
+        expect: 0
+      - check: $.data.stock
+        op: type
+        expect: int
+      - op: schema
+        schema_file: schemas/book.json
+
+  - id: book_not_found
+    name: 不存在的图书应返回 404
+    tags: [negative]
+    request:
+      method: GET
+      url: /api/books/999999
+    validate:
+      - check: status_code
+        op: eq
+        expect: 404
+      - check: $.code
+        op: eq
+        expect: 40401
+      - check: $.data
+        op: is_null

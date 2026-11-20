@@ -1,0 +1,96 @@
+name: FlowTest 示例用例集 · 异常路径与重试策略
+
+cases:
+  - id: unauthorized_access
+    name: 未携带 Token 访问受保护资源
+    tags: [negative, security]
+    request:
+      method: GET
+      url: /api/users/me
+    validate:
+      - check: status_code
+        op: eq
+        expect: 401
+      - check: $.code
+        op: eq
+        expect: 40100
+      - check: $.msg
+        op: eq
+        expect: unauthorized
+
+  - id: create_order_without_token
+    name: 未鉴权创建订单
+    tags: [negative, security]
+    request:
+      method: POST
+      url: /api/orders
+      json:
+        book_id: 101
+        quantity: 1
+    validate:
+      - check: status_code
+        op: eq
+        expect: 401
+      - check: $.code
+        op: eq
+        expect: 40100
+
+  - id: invalid_quantity
+    name: 数量边界值 0 应被拒绝
+    description: 跨文件依赖 login_success，展示整个目录被合并成同一张 DAG
+    depends_on: [login_success]
+    tags: [negative, boundary]
+    request:
+      method: POST
+      url: /api/orders
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+      json:
+        book_id: 101
+        quantity: 0
+    validate:
+      - check: status_code
+        op: eq
+        expect: 400
+      - check: $.code
+        op: eq
+        expect: 40002
+
+  - id: invalid_book
+    name: 不存在的 book_id 应返回 400
+    depends_on: [login_success]
+    tags: [negative, boundary]
+    request:
+      method: POST
+      url: /api/orders
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+      json:
+        book_id: 999999
+        quantity: 1
+    validate:
+      - check: status_code
+        op: eq
+        expect: 400
+      - check: $.code
+        op: eq
+        expect: 40001
+
+  - id: flaky_recovered
+    name: 服务 503 抖动，自动重试后恢复
+    description: Demo 服务每 3 次请求成功 1 次；retry=3 覆盖 3 次尝试，断言失败不触发重试
+    retry: 3
+    tags: [resilience, retry]
+    request:
+      method: GET
+      url: /api/flaky
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.data.status
+        op: eq
+        expect: RECOVERED
+      - check: $.code
+        op: eq
+        expect: 0

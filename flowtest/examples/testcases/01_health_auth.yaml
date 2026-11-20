@@ -1,0 +1,92 @@
+name: FlowTest 示例用例集 · 基础与鉴权
+base_url: ""
+variables:
+  admin_user: admin
+  admin_pwd: "123456"
+  expected_version: "1.0.0"
+headers:
+  X-Test-Client: flowtest
+
+cases:
+  - id: health_check
+    name: 健康检查（无依赖，L1 可并行）
+    description: 验证服务存活、版本号格式、响应头与耗时基线
+    tags: [smoke, baseline]
+    hooks: [log_case, set_timestamp]
+    request:
+      method: GET
+      url: /health
+      timeout: 5
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.code
+        op: eq
+        expect: 0
+      - check: $.data.status
+        op: eq
+        expect: UP
+      - check: $.data.version
+        op: eq
+        expect: ${expected_version}
+      - check: $.data.version
+        op: regex
+        expect: '^\d+\.\d+\.\d+$'
+      - check: headers.Content-Type
+        op: contains
+        expect: application/json
+      - check: elapsed_ms
+        op: lt
+        expect: 2000
+
+  - id: login_success
+    name: 管理员登录成功并提取 token
+    tags: [smoke, auth]
+    request:
+      method: POST
+      url: /api/login
+      json:
+        username: ${admin_user}
+        password: ${admin_pwd}
+    extract:
+      token: $.data.token
+      user_id: $.data.user.id
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.msg
+        op: eq
+        expect: login success
+      - check: $.data.token
+        op: regex
+        expect: '^[a-f0-9]{32}$'
+      - check: $.data.expires_in
+        op: gt
+        expect: 0
+      - check: $.data.user.username
+        op: eq
+        expect: ${admin_user}
+
+  - id: login_wrong_password
+    name: 错误密码应返回 401（负向用例）
+    tags: [auth, negative]
+    request:
+      method: POST
+      url: /api/login
+      json:
+        username: admin
+        password: wrong-password
+    validate:
+      - check: status_code
+        op: eq
+        expect: 401
+      - check: $.code
+        op: eq
+        expect: 40101
+      - check: $.data
+        op: is_null
+      - check: $.msg
+        op: contains
+        expect: invalid

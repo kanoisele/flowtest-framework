@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BookDetailResponse",
+  "type": "object",
+  "required": ["code", "msg", "data"],
+  "properties": {
+    "code": { "type": "integer", "const": 0 },
+    "msg": { "type": "string" },
+    "data": {
+      "type": "object",
+      "required": ["id", "title", "author", "price", "stock"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "author": { "type": "string" },
+        "price": { "type": "number", "minimum": 0 },
+        "stock": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

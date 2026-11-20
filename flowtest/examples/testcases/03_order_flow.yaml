@@ -1,0 +1,120 @@
+name: FlowTest 示例用例集 · 订单主流程（DAG 依赖编排）
+
+cases:
+  - id: create_order
+    name: 创建订单（跨用例变量：token + book_id）
+    description: 依赖 login_success 与 search_books；从两个上游用例各取一个变量拼装请求
+    depends_on: [login_success, search_books]
+    tags: [smoke, flow, core]
+    request:
+      method: POST
+      url: /api/orders
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+      json:
+        book_id: ${search_books.first_book_id}
+        quantity: 1
+    extract:
+      order_id: $.data.order_id
+      amount: $.data.amount
+    validate:
+      - check: status_code
+        op: eq
+        expect: 201
+      - check: $.data.order_id
+        op: regex
+        expect: '^ORD-[A-F0-9]{10}$'
+      - check: $.data.status
+        op: eq
+        expect: CREATED
+      - check: $.data.amount
+        op: gt
+        expect: 0
+      - check: $.data.book_id
+        op: eq
+        expect: ${search_books.first_book_id}
+      - op: schema
+        schema_file: schemas/order.json
+
+  - id: user_profile
+    name: 查询当前用户信息（与 create_order 同层，可并行执行）
+    depends_on: [login_success]
+    tags: [flow, parallel]
+    request:
+      method: GET
+      url: /api/users/me
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.data.id
+        op: eq
+        expect: ${login_success.user_id}
+      - check: $.data.role
+        op: in
+        expect: [admin, user]
+
+  - id: get_order
+    name: 查询刚创建的订单（URL 中插值上游变量）
+    depends_on: [create_order]
+    tags: [flow, core]
+    request:
+      method: GET
+      url: /api/orders/${create_order.order_id}
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.data.order_id
+        op: eq
+        expect: ${create_order.order_id}
+      - check: $.data.amount
+        op: eq
+        expect: ${create_order.amount}
+      - check: $.data.status
+        op: eq
+        expect: CREATED
+
+  - id: cancel_order
+    name: 取消订单
+    depends_on: [get_order]
+    tags: [flow]
+    request:
+      method: DELETE
+      url: /api/orders/${create_order.order_id}
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.msg
+        op: eq
+        expect: order cancelled
+      - check: $.data.status
+        op: eq
+        expect: CANCELLED
+
+  - id: order_after_cancel
+    name: 取消后再次查询，状态应保持一致（数据一致性校验）
+    depends_on: [cancel_order]
+    tags: [flow, consistency]
+    request:
+      method: GET
+      url: /api/orders/${create_order.order_id}
+      headers:
+        Authorization: "Bearer ${login_success.token}"
+    validate:
+      - check: status_code
+        op: eq
+        expect: 200
+      - check: $.data.status
+        op: eq
+        expect: CANCELLED
+      - check: $.data.order_id
+        op: eq
+        expect: ${create_order.order_id}

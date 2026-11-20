@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BookListResponse",
+  "type": "object",
+  "required": ["code", "msg", "data"],
+  "properties": {
+    "code": { "type": "integer", "const": 0 },
+    "msg": { "type": "string" },
+    "data": {
+      "type": "object",
+      "required": ["total", "page", "size", "items"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "page": { "type": "integer", "minimum": 1 },
+        "size": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/book" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "book": {
+      "type": "object",
+      "required": ["id", "title", "author", "price", "stock"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "author": { "type": "string" },
+        "price": { "type": "number", "minimum": 0 },
+        "stock": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
